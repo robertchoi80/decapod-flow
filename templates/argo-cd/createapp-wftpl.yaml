@@ -22,6 +22,11 @@ spec:
       - name: path
       - name: target_cluster  # set to site_name by default
       - name: namespace
+      # More sync options will be supported when they become necessary
+      - name: sync_option
+        enum:
+        - no_option
+        - replace
     activeDeadlineSeconds: 900
     container:
       name: 'create'
@@ -55,8 +60,7 @@ spec:
           ./argocd app create $ARGOCD_APP_NAME --repo $REPO --revision $REVISION --path $SITE_NAME/$APP_GROUP/$PATH --dest-namespace $NAMESPACE --dest-name $TARGET_CLUSTER --project $APP_GROUP --label app=$ARGOCD_APP_LABEL --directory-recurse
         fi
 
-        # For crds-only app, set sync-option to 'replace'
-        if [[ $ARGOCD_APP_NAME == *crds ]]; then
+        if [[ "$SYNC_OPTION" == "replace"]]; then
           ./argocd app set $ARGOCD_APP_NAME --sync-policy automated --auto-prune --sync-option Replace=true
         else
           ./argocd app set $ARGOCD_APP_NAME --sync-policy automated --auto-prune
@@ -79,18 +83,24 @@ spec:
           value: "{{inputs.parameters.path}}"
         - name: NAMESPACE
           value: "{{inputs.parameters.namespace}}"
+        - name: SYNC_OPTION
+          value: "{{inputs.parameters.sync_option}}"
 
   - name: installApps
     inputs:
       parameters:
-      - name: list
+      - name: app_list
+      - name: app_group
+      - name: target_cluster
+      - name: sync_option
     steps:
     - - name: "InstallApps"
         template: createApp
         arguments:
           parameters:
-          - {name: app_group, value: "{{item.app_group}}"}
+          - {name: app_group, value: "{{inputs.parameters.app_group}}"}
           - {name: path, value: "{{item.path}}"}
           - {name: namespace, value: "{{item.namespace}}"}
-          - {name: target_cluster, value: "{{item.target_cluster}}"}
-        withParam: "{{inputs.parameters.list}}"
+          - {name: target_cluster, value: "{{inputs.parameters.target_cluster}}"}
+          - {name: sync_option, value: "{{inputs.parameters.sync_option}}"}
+        withParam: "{{inputs.parameters.app_list}}"
