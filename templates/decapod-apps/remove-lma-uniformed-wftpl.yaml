@@ -63,6 +63,9 @@ spec:
 
           # Disable auto-sync
           ./argocd app set $PROM_APP_NAME --sync-policy none
+      envFrom:
+        - secretRef:
+            name: "decapod-argocd-config"
 
   - name: removePrometheusCR
     inputs:
