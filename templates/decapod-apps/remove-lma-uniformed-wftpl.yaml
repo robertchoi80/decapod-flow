@@ -27,6 +27,8 @@ spec:
           parameters:
           - name: namespace
             value:  "lma"
+          - name: kubeconfig_secret_name
+            value: "{{workflow.parameters.app_prefix}}-kubeconfig"
 
     - - name: removeLMA
         templateRef:
@@ -61,6 +63,8 @@ spec:
           ./argocd login $ARGO_SERVER --plaintext --insecure --username $ARGO_USERNAME \
           --password $ARGO_PASSWORD
 
+          echo "Disabling auto-sync of [$PROM_APP_NAME]' app.."
+
           # Disable auto-sync
           ./argocd app set $PROM_APP_NAME --sync-policy none
       envFrom:
@@ -71,6 +75,7 @@ spec:
     inputs:
       parameters:
         - name: namespace
+        - name: kubeconfig_secret_name
     container:
       name: remove-prometheus-cr
       image: k8s.gcr.io/hyperkube:v1.18.6
@@ -78,8 +83,21 @@ spec:
         - /bin/bash
         - '-c'
         - |
+          echo "Deleting prometheus CR..."
+          echo "kubeconfig_secret: {{inputs.parameters.kubeconfig_secret_name}}."
           # Delete prometheus CR
-          kubectl delete prometheus --all -n {{inputs.parameters.namespace}} || true
+          if [[ "{{inputs.parameters.kubeconfig_secret_name}}" == "-kubeconfig" ]]; then
+            kubectl delete prometheus --all -n {{inputs.parameters.namespace}}
+          else
+            cat <<< "$KUBE_CONFIG" > /etc/kubeconfig
+            kubectl --kubeconfig=/etc/kubeconfig delete prometheus --all -n {{inputs.parameters.namespace}}
+          fi
+      env:
+      - name: KUBE_CONFIG
+        valueFrom:
+          secretKeyRef:
+            name: "{{ inputs.parameters.kubeconfig_secret_name }}"
+            key: value
 
   - name: removeLeftoverResources
     inputs:
