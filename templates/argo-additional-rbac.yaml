@@ -65,3 +65,12 @@ rules:
   - delete
   - list
   - patch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - prometheuses
+  verbs:
+  - create
+  - get
+  - delete
+  - list
