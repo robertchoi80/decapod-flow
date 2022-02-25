@@ -32,10 +32,6 @@ spec:
         templateRef:
           name: delete-apps
           template: DeleteAppsByLabel
-        arguments:
-          parameters: 
-          - name: filter
-            value: "{{ workflow.parameters.filter }}"
 
       # LMA appGroup specific task #
     - - name: cleanupLeftoverResources

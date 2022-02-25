@@ -4,11 +4,13 @@ metadata:
   name: delete-apps
   namespace: argo
 spec:
+  arguments:
+    parameters:
+    # Filter to filter argocd apps (E.g., "app=lma")
+    - name: filter
+      value: ""
   templates:
   - name: DeleteAppsByLabel
-    inputs:
-      parameters:
-      - name: filter
     activeDeadlineSeconds: 900
     container:
       name: 'delete-apps'
@@ -78,4 +80,4 @@ spec:
             name: "decapod-argocd-config"
       env:
         - name: FILTER
-          value: "{{inputs.parameters.filter}}"
+          value: "{{workflow.parameters.filter}}"
