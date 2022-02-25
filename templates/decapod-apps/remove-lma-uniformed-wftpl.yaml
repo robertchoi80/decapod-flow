@@ -8,12 +8,26 @@ spec:
   entrypoint: process
   arguments:
     parameters:
-    # Filter to filter argocd apps (E.g., "app=lma")
+    - name: app_prefix
+      value: ""
+    # Filter to filter argocd apps
     - name: filter
       value: "app=lma"
   templates:
   - name: process
     steps:
+    - - name: disableAutoSyncOfPrometheus
+        template: disableAutoSync
+
+    # Delete prometheus CR first so that it doesn't hang
+    # due to service-account deletion #
+    - - name: removePrometheusCR
+        template: removePrometheusCR
+        arguments:
+          parameters:
+          - name: namespace
+            value:  "lma"
+
     - - name: removeLMA
         templateRef:
           name: delete-apps
@@ -30,6 +44,43 @@ spec:
           parameters:
           - name: namespace
             value:  "lma"
+
+  #######################
+  # Template Definition #
+  #######################
+
+  - name: disableAutoSync
+    container:
+      name: disable-auto-sync
+      image: docker.io/sktcloud/argocd-cli:v2.2.5
+      command:
+        - /bin/bash
+        - '-c'
+        - |
+          PROM_APP_NAME="prometheus"
+          if [[ -n "{{workflow.parameters.app_prefix}}" ]]; then
+            PROM_APP_NAME="{{workflow.parameters.app_prefix}}-prometheus"
+          fi
+          # Login to Argo CD server
+          ./argocd login $ARGO_SERVER --plaintext --insecure --username $ARGO_USERNAME \
+          --password $ARGO_PASSWORD
+
+          # Disable auto-sync
+          ./argocd app set $PROM_APP_NAME --sync-policy none
+
+  - name: removePrometheusCR
+    inputs:
+      parameters:
+        - name: namespace
+    container:
+      name: remove-prometheus-cr
+      image: k8s.gcr.io/hyperkube:v1.18.6
+      command:
+        - /bin/bash
+        - '-c'
+        - |
+          # Delete prometheus CR
+          kubectl delete prometheus --all -n {{inputs.parameters.namespace}} || true
 
   - name: removeLeftoverResources
     inputs:
