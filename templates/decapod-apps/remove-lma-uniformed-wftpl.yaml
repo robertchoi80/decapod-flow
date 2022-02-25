@@ -8,6 +8,10 @@ spec:
   entrypoint: process
   arguments:
     parameters:
+    # 'cluster_id' is only for TKS use-case
+    # TODO: better to rename this to 'site_name' later
+    - name: cluster_id
+      value: ""
     - name: app_prefix
       value: ""
     # Filter to filter argocd apps
@@ -28,7 +32,7 @@ spec:
           - name: namespace
             value:  "lma"
           - name: kubeconfig_secret_name
-            value: "{{workflow.parameters.app_prefix}}-kubeconfig"
+            value: "{{workflow.parameters.cluster_id}}-kubeconfig"
 
     - - name: removeLMA
         templateRef:
@@ -86,7 +90,7 @@ spec:
           echo "Deleting prometheus CR..."
           echo "kubeconfig_secret: {{inputs.parameters.kubeconfig_secret_name}}."
           # Delete prometheus CR
-          if [[ "{{inputs.parameters.kubeconfig_secret_name}}" == "-kubeconfig" ]]; then
+          if [[ -z "{{workflow.parameters.cluster_id}}" ]]; then
             kubectl delete prometheus --all -n {{inputs.parameters.namespace}}
           else
             cat <<< "$KUBE_CONFIG" > /etc/kubeconfig
