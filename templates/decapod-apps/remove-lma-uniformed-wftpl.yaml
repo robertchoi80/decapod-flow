@@ -92,9 +92,11 @@ spec:
           # Delete prometheus CR
           if [[ -z "{{workflow.parameters.cluster_id}}" ]]; then
             kubectl delete prometheus --all -n {{inputs.parameters.namespace}}
+            kubectl delete alertmanager --all -n {{inputs.parameters.namespace}}
           else
             cat <<< "$KUBE_CONFIG" > /etc/kubeconfig
             kubectl --kubeconfig=/etc/kubeconfig delete prometheus --all -n {{inputs.parameters.namespace}}
+            kubectl --kubeconfig=/etc/kubeconfig delete alertmanager --all -n {{inputs.parameters.namespace}}
           fi
       env:
       - name: KUBE_CONFIG

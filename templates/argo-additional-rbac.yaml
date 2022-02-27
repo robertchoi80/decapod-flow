@@ -69,6 +69,7 @@ rules:
   - monitoring.coreos.com
   resources:
   - prometheuses
+  - alertmanagers
   verbs:
   - create
   - get
