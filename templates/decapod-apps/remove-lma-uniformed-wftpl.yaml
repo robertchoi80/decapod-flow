@@ -46,6 +46,8 @@ spec:
           parameters:
           - name: namespace
             value:  "lma"
+          - name: kubeconfig_secret_name
+            value: "{{workflow.parameters.cluster_id}}-kubeconfig"
 
   #######################
   # Template Definition #
@@ -87,9 +89,9 @@ spec:
         - /bin/bash
         - '-c'
         - |
-          echo "Deleting prometheus CR..."
+          echo "Deleting prometheus CRs..."
           echo "kubeconfig_secret: {{inputs.parameters.kubeconfig_secret_name}}."
-          # Delete prometheus CR
+
           if [[ -z "{{workflow.parameters.cluster_id}}" ]]; then
             kubectl delete prometheus --all -n {{inputs.parameters.namespace}}
             kubectl delete alertmanager --all -n {{inputs.parameters.namespace}}
@@ -116,5 +118,19 @@ spec:
         - /bin/bash
         - '-c'
         - |
-          kubectl delete secret etcd-client-cert prometheus-operator-admission -n {{inputs.parameters.namespace}} || true
-          kubectl delete pvc --all -n {{inputs.parameters.namespace}}
+          echo "Deleting secrets and PVCs..."
+
+          if [[ -z "{{workflow.parameters.cluster_id}}" ]]; then
+            kubectl delete secret etcd-client-cert prometheus-operator-admission -n {{inputs.parameters.namespace}} || true
+            kubectl delete pvc --all -n {{inputs.parameters.namespace}}
+          else
+            cat <<< "$KUBE_CONFIG" > /etc/kubeconfig
+            kubectl --kubeconfig=/etc/kubeconfig delete secret etcd-client-cert prometheus-operator-admission -n {{inputs.parameters.namespace}} || true
+            kubectl --kubeconfig=/etc/kubeconfig delete pvc --all -n {{inputs.parameters.namespace}}
+          fi
+      env:
+      - name: KUBE_CONFIG
+        valueFrom:
+          secretKeyRef:
+            name: "{{ inputs.parameters.kubeconfig_secret_name }}"
+            key: value
