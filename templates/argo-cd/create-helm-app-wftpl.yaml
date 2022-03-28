@@ -1,0 +1,78 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: create-helm-application
+  namespace: argo
+spec:
+  arguments:
+    parameters:
+    # This param is solely used as target_cluster name in this workflow
+    - name: site_name
+      value: "hanu-deploy-apps"
+    - name: app_prefix
+      value: ""
+  templates:
+  - name: createApp
+    inputs:
+      parameters:
+      - name: app_group
+      - name: helm_repo_url
+      - name: chart_name
+      - name: chart_version
+      - name: target_cluster  # set to site_name by default
+      - name: namespace
+    activeDeadlineSeconds: 900
+    retryStrategy:
+      limit: 3
+      retryPolicy: "Always"
+    container:
+      name: 'create'
+      image: docker.io/sktcloud/argocd-cli:v2.2.5
+      imagePullPolicy: IfNotPresent
+      command:
+      - /bin/bash
+      - -c
+      - |
+        # log into Argo CD server
+        ./argocd login $ARGO_SERVER --plaintext --insecure --username $ARGO_USERNAME \
+        --password $ARGO_PASSWORD
+
+        TARGET_CLUSTER="{{workflow.parameters.site_name}}"
+        if [[ -n "{{inputs.parameters.target_cluster}}" ]]; then
+          TARGET_CLUSTER="{{inputs.parameters.target_cluster}}"
+        fi
+
+        # TODO: another option is to set default app_prefix to 'site_name' and always apply that prefix.
+        ARGOCD_APP_NAME=$CHART_NAME
+        ARGOCD_APP_LABEL=$APP_GROUP
+        if [[ -n "{{workflow.parameters.app_prefix}}" ]]; then
+          ARGOCD_APP_NAME="{{workflow.parameters.app_prefix}}-$CHART_NAME"
+          ARGOCD_APP_LABEL="{{workflow.parameters.app_prefix}}-$APP_GROUP"
+        fi
+
+        # check if the argocd app already exists.
+        ./argocd app get $ARGOCD_APP_NAME
+        if [[ $? -ne 0 ]]; then
+          # create new application if it doesn't exist.
+          argocd app create $ARGOCD_APP_NAME --repo $HELM_REPO --helm-chart $CHART_NAME --revision $VERSION --dest-namespace $NAMESPACE --dest-name $TARGET_CLUSTER --project $APP_GROUP --label app=$ARGOCD_APP_LABEL --directory-recurse 
+        fi
+
+        ./argocd app set $ARGOCD_APP_NAME --sync-policy automated --auto-prune
+        ./argocd app sync $ARGOCD_APP_NAME --async
+        ./argocd app wait $ARGOCD_APP_NAME --health
+      envFrom:
+        - secretRef:
+            name: "decapod-argocd-config"
+      env:
+        - name: SITE_NAME
+          value: "{{workflow.parameters.site_name}}"
+        - name: HELM_REPO
+          value: "{{inputs.parameters.helm_repo_url}}"
+        - name: CHART_NAME
+          value: "{{inputs.parameters.chart_name}}"
+        - name: VERSION
+          value: "{{inputs.parameters.chart_version}}"
+        - name: APP_GROUP
+          value: "{{inputs.parameters.app_group}}"
+        - name: NAMESPACE
+          value: "{{inputs.parameters.namespace}}"
